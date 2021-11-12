@@ -36,6 +36,7 @@ class App:
                 cell = tk.Entry(self.__grid)
                 cell["font"] = "Helvetica 24 bold"
                 cell["justify"] = tk.CENTER
+                cell["state"] = "disabled"
                 cell["highlightbackground"] = "black"
                 cell["highlightthickness"] = 1
                 cell["textvariable"] = var
@@ -66,7 +67,10 @@ class App:
         pass
 
     def __clearGrid(self):
-        pass
+        for i in range(9):
+            for j in range(9):
+                self.__intVars[i, j].set("")
+                self.__cells[i, j]['bg'] = "white"
 
     def __enableWebcam(self):
         pass

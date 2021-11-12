@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import tkinter as tk
 
@@ -73,7 +74,23 @@ class App:
                 self.__cells[i, j]['bg'] = "white"
 
     def __enableWebcam(self):
-        pass
+        x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
+        # Create a child window that will contain the webcam video
+        self.__webcamWin = tk.Toplevel(self.__mainWindow)
+        self.__webcamWin.geometry("1080x720+%d+%d" % (x+600, y))
+        self.__webcamWin.resizable(False, False)
+        self.__webcamWin.bind('<Escape>', lambda x: self.__webcamWin.quit())
+        self.__webcamLabel = tk.Label(self.__webcamWin)
+        self.__webcamLabel.pack()
+
+        # Create the webcam
+        self.__vc = cv2.VideoCapture(0)
+        self.__vc.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
+        self.__vc.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+        # Shows all frames
+        self.__showFrame()
+        self.__webcamWin.mainloop()
 
     def __showFrame(self):
         pass

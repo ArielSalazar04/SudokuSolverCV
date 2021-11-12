@@ -12,6 +12,7 @@ class App:
     __grid = None
     __clearButton = None
     __infoButton = None
+    __vc = None
 
     __digitReader = None
     __cells = np.empty((9, 9)).astype(tk.Entry)
@@ -23,7 +24,8 @@ class App:
         self.__mainWindow.title("Sudoku Solver CV")
         self.__mainWindow.geometry("%dx%d+%d+%d" % (540, 540, 50, 50))
         self.__mainWindow.resizable(False, False)
-        self.__mainWindow.bind('<Escape>', lambda x: self.__mainWindow.quit())
+        self.__mainWindow.bind('<Escape>', lambda m: self.killMainWin())
+        self.__mainWindow.protocol("WM_DELETE_WINDOW", self.killMainWin)
 
         # Create Grid
         self.__grid = tk.Frame(self.__mainWindow)
@@ -74,12 +76,15 @@ class App:
                 self.__intVars[i, j].set("")
                 self.__cells[i, j]['bg'] = "white"
 
+    def killMainWin(self):
+        self.__mainWindow.destroy()
+        self.__mainWindow.quit()
+
     def killWebcamWin(self):
         self.__webcamButton["state"] = "normal"
         self.__webcamWin.destroy()
         self.__webcamWin.quit()
         self.__vc.release()
-
 
     def __enableWebcam(self):
         # Disable webcam button
@@ -90,7 +95,7 @@ class App:
         self.__webcamWin = tk.Toplevel(self.__mainWindow)
         self.__webcamWin.geometry("1020x760+%d+%d" % (x+600, y))
         self.__webcamWin.resizable(False, False)
-        self.__webcamWin.bind('<Escape>', lambda x: self.killWebcamWin())
+        self.__webcamWin.bind('<Escape>', lambda w: self.killWebcamWin())
         self.__webcamWin.protocol("WM_DELETE_WINDOW", self.killWebcamWin)
         self.__webcamLabel = tk.Label(self.__webcamWin)
         self.__webcamLabel.pack()

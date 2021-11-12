@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import tkinter as tk
+from PIL import Image, ImageTk
 
 
 class App:
@@ -73,13 +74,24 @@ class App:
                 self.__intVars[i, j].set("")
                 self.__cells[i, j]['bg'] = "white"
 
+    def killWebcamWin(self):
+        self.__webcamButton["state"] = "normal"
+        self.__webcamWin.destroy()
+        self.__webcamWin.quit()
+        self.__vc.release()
+
+
     def __enableWebcam(self):
-        x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
+        # Disable webcam button
+        self.__webcamButton["state"] = "disable"
+
         # Create a child window that will contain the webcam video
+        x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
         self.__webcamWin = tk.Toplevel(self.__mainWindow)
-        self.__webcamWin.geometry("1080x720+%d+%d" % (x+600, y))
+        self.__webcamWin.geometry("1020x760+%d+%d" % (x+600, y))
         self.__webcamWin.resizable(False, False)
-        self.__webcamWin.bind('<Escape>', lambda x: self.__webcamWin.quit())
+        self.__webcamWin.bind('<Escape>', lambda x: self.killWebcamWin())
+        self.__webcamWin.protocol("WM_DELETE_WINDOW", self.killWebcamWin)
         self.__webcamLabel = tk.Label(self.__webcamWin)
         self.__webcamLabel.pack()
 
@@ -93,8 +105,16 @@ class App:
         self.__webcamWin.mainloop()
 
     def __showFrame(self):
-        pass
+        # Read and preprocess frame
+        success, img = self.__vc.read()
+
+        # Display next image onto webcam window
+        cv2Img = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2RGBA)
+        webcamImg = Image.fromarray(cv2Img)
+        imgtk = ImageTk.PhotoImage(image=webcamImg)
+        self.__webcamLabel.imgtk = imgtk
+        self.__webcamLabel.configure(image=imgtk)
+        self.__webcamLabel.after(10, self.__showFrame)
 
     def __showInfo(self):
         pass
-

@@ -1,7 +1,9 @@
 import cv2
 import numpy as np
 import tkinter as tk
+from tkinter import messagebox
 from PIL import Image, ImageTk
+from PuzzleFinder import PuzzleFinder
 
 
 class App:
@@ -13,6 +15,7 @@ class App:
     __clearButton = None
     __infoButton = None
     __vc = None
+    __puzzleFinder = None
 
     __digitReader = None
     __cells = np.empty((9, 9)).astype(tk.Entry)
@@ -24,8 +27,8 @@ class App:
         self.__mainWindow.title("Sudoku Solver CV")
         self.__mainWindow.geometry("%dx%d+%d+%d" % (540, 540, 50, 50))
         self.__mainWindow.resizable(False, False)
-        self.__mainWindow.bind('<Escape>', lambda m: self.killMainWin())
-        self.__mainWindow.protocol("WM_DELETE_WINDOW", self.killMainWin)
+        self.__mainWindow.bind('<Escape>', lambda m: self.__killMainWin())
+        self.__mainWindow.protocol("WM_DELETE_WINDOW", self.__killMainWin)
 
         # Create Grid
         self.__grid = tk.Frame(self.__mainWindow)
@@ -76,42 +79,60 @@ class App:
                 self.__intVars[i, j].set("")
                 self.__cells[i, j]['bg'] = "white"
 
-    def killMainWin(self):
+    def __killMainWin(self):
         self.__mainWindow.destroy()
         self.__mainWindow.quit()
 
-    def killWebcamWin(self):
+    def __killWebcamWin(self):
         self.__webcamButton["state"] = "normal"
         self.__webcamWin.destroy()
         self.__webcamWin.quit()
         self.__vc.release()
 
     def __enableWebcam(self):
-        # Disable webcam button
-        self.__webcamButton["state"] = "disable"
-
-        # Create a child window that will contain the webcam video
-        x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
-        self.__webcamWin = tk.Toplevel(self.__mainWindow)
-        self.__webcamWin.geometry("1020x760+%d+%d" % (x+600, y))
-        self.__webcamWin.resizable(False, False)
-        self.__webcamWin.bind('<Escape>', lambda w: self.killWebcamWin())
-        self.__webcamWin.protocol("WM_DELETE_WINDOW", self.killWebcamWin)
-        self.__webcamLabel = tk.Label(self.__webcamWin)
-        self.__webcamLabel.pack()
-
         # Create the webcam
         self.__vc = cv2.VideoCapture(0)
         self.__vc.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
         self.__vc.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-        # Shows all frames
-        self.__showFrame()
-        self.__webcamWin.mainloop()
+        success, img = self.__vc.read()
+        if success:
+            # Disable webcam button
+            self.__webcamButton["state"] = "disable"
+
+            # Create a child window that will contain the webcam video
+            x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
+            self.__webcamWin = tk.Toplevel(self.__mainWindow)
+            self.__webcamWin.geometry("1020x760+%d+%d" % (x + 600, y))
+            self.__webcamWin.resizable(False, False)
+            self.__webcamWin.bind('<Escape>', lambda w: self.__killWebcamWin())
+            self.__webcamWin.protocol("WM_DELETE_WINDOW", self.__killWebcamWin)
+            self.__webcamLabel = tk.Label(self.__webcamWin)
+            self.__webcamLabel.pack()
+
+            self.__puzzleFinder = PuzzleFinder(img)
+            self.__showFrame()
+            self.__webcamWin.mainloop()
+
+        else:
+            self.__showWebcamError()
 
     def __showFrame(self):
         # Read and preprocess frame
         success, img = self.__vc.read()
+        if not success:
+            self.__killWebcamWin()
+            self.__showWebcamError()
+            return None
+
+        # Get grid contour (if none is found, continue to next frame)
+        self.__puzzleFinder.updateImage(img)
+        gridContour = self.__puzzleFinder.getGridContour()
+
+        # If contour is found, extract the puzzle from the image and solve the puzzle
+        if gridContour is not None:
+            # extract puzzle
+            pass
 
         # Display next image onto webcam window
         cv2Img = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2RGBA)
@@ -121,5 +142,10 @@ class App:
         self.__webcamLabel.configure(image=imgtk)
         self.__webcamLabel.after(10, self.__showFrame)
 
+    @staticmethod
     def __showInfo(self):
         pass
+
+    @staticmethod
+    def __showWebcamError():
+        messagebox.showerror("Error", "Webcam did not open successfully.")

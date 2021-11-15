@@ -1,15 +1,22 @@
 import cv2
+import imutils
 import numpy as np
 from math import dist
+from tensorflow.keras.models import load_model
+from keras_preprocessing.image import img_to_array
+from skimage.segmentation import clear_border
 
 
 class PuzzleFinder:
     __image = None
     __cannyImage = None
     __gridCorners = None
+    __puzzleImage = None
+    __digitReader = None
 
     def __init__(self, img):
         self.updateImage(img)
+        self.__digitReader = load_model("model/digitReader.h5")
 
     def updateImage(self, image):
         self.__image = image
@@ -76,11 +83,55 @@ class PuzzleFinder:
         # Preprocess image before analyzing squares
         grayscaleGrid = cv2.cvtColor(warpedGrid, cv2.COLOR_BGR2GRAY)
         threshGrid = cv2.threshold(grayscaleGrid, 127, 255, cv2.THRESH_BINARY)[1]
-        puzzleImage = cv2.resize(threshGrid, (450, 450), interpolation=cv2.INTER_AREA)
-        return puzzleImage
+        self.__puzzleImage = cv2.resize(threshGrid, (450, 450), interpolation=cv2.INTER_AREA)
 
     def analyzeSquares(self):
-        pass
+        puzzle = np.zeros((9, 9)).astype(int)
+        newCoordinates = set()
 
-    def __extractDigit(self):
-        pass
+        for y in range(0, 401, 50):
+            for x in range(0, 401, 50):
+                square = self.__puzzleImage[y:y + 50, x:x + 50]
+
+                # Determine if digit contains a digit or not
+                digit = self.__extractDigit(square)
+                prediction = 0
+
+                # If digit exists, predict it
+                if digit is not None:
+                    squareSample = cv2.resize(digit, (28, 28))
+                    squareSample = squareSample.astype("float") / 255.0
+                    squareSample = img_to_array(squareSample)
+                    squareSample = np.expand_dims(squareSample, axis=0)
+                    prediction = int(self.__digitReader.predict(squareSample).argmax(axis=1)[0])
+                else:
+                    newCoordinates.add((y // 50, x // 50))
+
+                puzzle[y // 50, x // 50] = prediction
+
+        return puzzle, newCoordinates
+
+    def __extractDigit(self, cell):
+        thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+        thresh = clear_border(thresh)
+
+        cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+
+        if len(cnts) == 0:
+            return None
+
+        c = max(cnts, key=cv2.contourArea)
+        mask = np.zeros(thresh.shape, dtype="uint8")
+        cv2.drawContours(mask, [c], -1, 255, -1)
+
+        (h, w) = thresh.shape
+
+        percentFilled = cv2.countNonZero(mask) / float(h * w)
+
+        if percentFilled < 0.03:
+            return None
+
+        digit = cv2.bitwise_and(thresh, thresh, mask=mask)
+
+        return digit

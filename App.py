@@ -131,8 +131,11 @@ class App:
 
         # If contour is found, extract the puzzle from the image and solve the puzzle
         if hasGrid:
-            # extract puzzle
-            gridImage = self.__puzzleFinder.extractGridFromContour()
+            # Extract puzzle and solve it
+            self.__puzzleFinder.extractGridFromContour()
+            sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
+
+            # Solve the puzzle only if all constraints are met
 
         # Display next image onto webcam window
         cv2Img = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2RGBA)

@@ -127,12 +127,12 @@ class App:
 
         # Get grid contour (if none is found, continue to next frame)
         self.__puzzleFinder.updateImage(img)
-        gridContour = self.__puzzleFinder.getGridContour()
+        hasGrid = self.__puzzleFinder.getGridContour()
 
         # If contour is found, extract the puzzle from the image and solve the puzzle
-        if gridContour is not None:
+        if hasGrid:
             # extract puzzle
-            pass
+            gridImage = self.__puzzleFinder.extractGridFromContour()
 
         # Display next image onto webcam window
         cv2Img = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2RGBA)

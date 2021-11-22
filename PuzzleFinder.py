@@ -14,9 +14,9 @@ class PuzzleFinder:
     __puzzleImage = None
     __digitReader = None
 
-    def __init__(self, img):
+    def __init__(self, img, digitReader):
         self.updateImage(img)
-        self.__digitReader = load_model("model/digitReader.h5")
+        self.__digitReader = digitReader
 
     def updateImage(self, image):
         self.__image = image
@@ -27,7 +27,10 @@ class PuzzleFinder:
         imgBlurred = cv2.GaussianBlur(imgGray, (5, 5), 3)
         self.__cannyImage = cv2.Canny(imgBlurred, 50, 50)
 
-    def getGridContour(self, minArea=200000, maxArea=220000):
+    def getCannyImage(self):
+        return self.__cannyImage
+
+    def getGridCorners(self, minArea=200000, maxArea=220000):
         contours, hierarchy = cv2.findContours(self.__cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         minOutline, maxOutline = minArea-50000, maxArea+50000
 
@@ -59,7 +62,10 @@ class PuzzleFinder:
         self.__gridCorners = None
         return False
 
-    def extractGridFromContour(self):
+    def setCorners(self, corners):
+        self.__gridCorners = corners
+
+    def extractGridFromCorners(self):
         # Classify each point as top/bottom and left/right
         sortedCoordinates = self.__gridCorners[self.__gridCorners[:, 0].argsort()]
         leftSide = sortedCoordinates[:2]

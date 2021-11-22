@@ -2,9 +2,11 @@ import cv2
 import numpy as np
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import filedialog
 from PIL import Image, ImageTk
 from PuzzleFinder import PuzzleFinder
 from SudokuSolver import SudokuSolver
+from tensorflow.keras.models import load_model
 
 
 class App:
@@ -12,6 +14,7 @@ class App:
     __webcamWindow = None
     __webcamLabel = None
     __webcamButton = None
+    __uploadButton = None
     __grid = None
     __clearButton = None
     __infoButton = None
@@ -24,6 +27,9 @@ class App:
     __intVars = np.empty((9, 9)).astype(tk.IntVar)
 
     def __init__(self):
+        # Load digit reader
+        self.__digitReader = load_model("model/digitReader.h5")
+
         # Create GUI main window
         self.__mainWindow = tk.Tk()
         self.__mainWindow.title("Sudoku Solver CV")
@@ -56,7 +62,13 @@ class App:
         self.__webcamButton = tk.Button(self.__mainWindow, command=self.__enableWebcam)
         self.__webcamButton["text"] = "Launch Webcam"
         self.__webcamButton["font"] = "Helvetica 12 bold"
-        self.__webcamButton.place(width=154, height=36, relx=0.5, rely=0.80, anchor=tk.CENTER)
+        self.__webcamButton.place(width=154, height=36, relx=0.35, rely=0.80, anchor=tk.CENTER)
+
+        # Upload Image Button
+        self.__uploadButton = tk.Button(self.__mainWindow, command=self.__uploadImage)
+        self.__uploadButton["text"] = "Upload Image"
+        self.__uploadButton["font"] = "Helvetica 12 bold"
+        self.__uploadButton.place(width=154, height=36, relx=0.65, rely=0.80, anchor=tk.CENTER)
 
         # Clear Button
         self.__clearButton = tk.Button(self.__mainWindow, command=self.__clearGrid)
@@ -75,14 +87,14 @@ class App:
         for i in range(9):
             for j in range(9):
                 self.__intVars[i, j].set(sudokuGrid[i, j])
-                self.__cells[i, j]["bg"] = "green" if (i, j) in newCoordinates else "white"
+                self.__cells[i, j]["bg"] = "green" if (i, j) in newCoordinates else "black"
                 self.__cells[i, j]["font"] = "Helvetica 16 bold" if (i, j) in newCoordinates else "Helvetica 16"
 
     def __clearGrid(self):
         for i in range(9):
             for j in range(9):
                 self.__intVars[i, j].set("")
-                self.__cells[i, j]['bg'] = "white"
+                self.__cells[i, j]['bg'] = "black"
 
     def __killMainWin(self):
         self.__mainWindow.destroy()
@@ -115,7 +127,7 @@ class App:
             self.__webcamLabel = tk.Label(self.__webcamWin)
             self.__webcamLabel.pack()
 
-            self.__puzzleFinder = PuzzleFinder(img)
+            self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
             self.__sudokuSolver = SudokuSolver()
             self.__showFrame()
             self.__webcamWin.mainloop()
@@ -133,12 +145,12 @@ class App:
 
         # Get grid contour (if none is found, continue to next frame)
         self.__puzzleFinder.updateImage(img)
-        hasGrid = self.__puzzleFinder.getGridContour()
+        hasGrid = self.__puzzleFinder.getGridCornersWeb()
 
         # If contour is found, extract the puzzle from the image and solve the puzzle
         if hasGrid:
             # Extract puzzle and solve it
-            self.__puzzleFinder.extractGridFromContour()
+            self.__puzzleFinder.extractGridFromCorners()
             sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
 
             # Solve the puzzle only if all constraints are met
@@ -148,12 +160,41 @@ class App:
                     self.__updateGrid(sudokuPuzzle, blankSquares)
 
         # Display next image onto webcam window
-        cv2Img = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2RGBA)
+        cv2Img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
         webcamImg = Image.fromarray(cv2Img)
         imgtk = ImageTk.PhotoImage(image=webcamImg)
         self.__webcamLabel.imgtk = imgtk
         self.__webcamLabel.configure(image=imgtk)
         self.__webcamLabel.after(10, self.__showFrame)
+
+    def __uploadImage(self):
+        # if not image file, show error message
+        filePath = filedialog.askopenfilename()
+        if not filePath.endswith((".png", ".jpg", "jpeg")):
+            self.__showFileExtensionError()
+            return None
+
+        # read and preprocess the image
+        img = cv2.imread(filePath)
+        self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
+        self.__sudokuSolver = SudokuSolver()
+
+        # if numpy array is valid and can be solved, update the grid
+        hasGrid = self.__puzzleFinder.getGridCornersUpload()
+
+        # If contour is found, extract the puzzle from the image and solve the puzzle
+        if hasGrid is not None:
+            # Extract puzzle and solve it
+            self.__puzzleFinder.extractGridFromCorners()
+            sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
+
+            # Solve the puzzle only if all constraints are met
+            if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
+                self.__sudokuSolver.setGrid(sudokuPuzzle)
+                if self.__sudokuSolver.solveSudoku():
+                    self.__updateGrid(sudokuPuzzle, blankSquares)
+            else:
+                self.__showIllegalConstraintsError()
 
     @staticmethod
     def __showInfo(self):
@@ -162,3 +203,12 @@ class App:
     @staticmethod
     def __showWebcamError():
         messagebox.showerror("Error", "Webcam did not open successfully.")
+
+    @staticmethod
+    def __showIllegalConstraintsError():
+        messagebox.showerror("Error", "Either the puzzle entered does not meet all sudoku constraints or the puzzle was not read correctly. Try again.")
+
+    @staticmethod
+    def __showFileExtensionError():
+        messagebox.showerror("Invalid File Extension", "File must have a .png, .jpg, or .jpeg extension")
+

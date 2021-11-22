@@ -27,10 +27,9 @@ class PuzzleFinder:
         imgBlurred = cv2.GaussianBlur(imgGray, (5, 5), 3)
         self.__cannyImage = cv2.Canny(imgBlurred, 50, 50)
 
-    def getGridContour(self):
+    def getGridContour(self, minArea=200000, maxArea=220000):
         contours, hierarchy = cv2.findContours(self.__cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        minOutline, maxOutline = 360000, 450000
-        minArea, maxArea = 400000, 420000
+        minOutline, maxOutline = minArea-50000, maxArea+50000
 
         # find grid contour
         for cnt in contours:
@@ -48,8 +47,14 @@ class PuzzleFinder:
 
                 # Sudoku grid has been detected
                 if minArea <= area <= maxArea:
+                    cv2.putText(self.__image, "Hold Still", (430, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 16)
+                    cv2.putText(self.__image, "Hold Still", (430, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 2)
                     self.__gridCorners = approx.reshape((4, 2))
                     return True
+                else:
+                    prompt = "Bring Closer" if area < minArea else "Move Further"
+                    cv2.putText(self.__image, prompt, (420, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 16)
+                    cv2.putText(self.__image, prompt, (420, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 2)
 
         self.__gridCorners = None
         return False
@@ -77,8 +82,8 @@ class PuzzleFinder:
         # Warp the image
         inputPts = np.float32([topLeft, bottomLeft, bottomRight, topRight])
         outputPts = np.float32([[0, 0], [0, maxHeight - 1], [maxWidth - 1, maxHeight - 1], [maxWidth - 1, 0]])
-        M = cv2.getPerspectiveTransform(inputPts, outputPts)
-        warpedGrid = cv2.warpPerspective(self.__image, M, (maxWidth, maxHeight), flags=cv2.INTER_LINEAR)
+        transformation = cv2.getPerspectiveTransform(inputPts, outputPts)
+        warpedGrid = cv2.warpPerspective(self.__image, transformation, (maxWidth, maxHeight), flags=cv2.INTER_LINEAR)
 
         # Preprocess image before analyzing squares
         grayscaleGrid = cv2.cvtColor(warpedGrid, cv2.COLOR_BGR2GRAY)
@@ -111,7 +116,8 @@ class PuzzleFinder:
 
         return puzzle, newCoordinates
 
-    def __extractDigit(self, cell):
+    @staticmethod
+    def __extractDigit(cell):
         thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
         thresh = clear_border(thresh)
 

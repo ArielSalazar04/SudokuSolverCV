@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk
 from PuzzleFinder import PuzzleFinder
+from SudokuSolver import SudokuSolver
 
 
 class App:
@@ -16,6 +17,7 @@ class App:
     __infoButton = None
     __vc = None
     __puzzleFinder = None
+    __sudokuSolver = None
 
     __digitReader = None
     __cells = np.empty((9, 9)).astype(tk.Entry)
@@ -43,7 +45,6 @@ class App:
                 cell = tk.Entry(self.__grid)
                 cell["font"] = "Helvetica 24 bold"
                 cell["justify"] = tk.CENTER
-                cell["state"] = "disabled"
                 cell["highlightbackground"] = "black"
                 cell["highlightthickness"] = 1
                 cell["textvariable"] = var
@@ -70,8 +71,12 @@ class App:
         # Launch the Tkinter GUI
         self.__mainWindow.mainloop()
 
-    def __updateGrid(self):
-        pass
+    def __updateGrid(self, sudokuGrid, newCoordinates):
+        for i in range(9):
+            for j in range(9):
+                self.__intVars[i, j].set(sudokuGrid[i, j])
+                self.__cells[i, j]["bg"] = "green" if (i, j) in newCoordinates else "white"
+                self.__cells[i, j]["font"] = "Helvetica 16 bold" if (i, j) in newCoordinates else "Helvetica 16"
 
     def __clearGrid(self):
         for i in range(9):
@@ -111,6 +116,7 @@ class App:
             self.__webcamLabel.pack()
 
             self.__puzzleFinder = PuzzleFinder(img)
+            self.__sudokuSolver = SudokuSolver()
             self.__showFrame()
             self.__webcamWin.mainloop()
 
@@ -136,6 +142,10 @@ class App:
             sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
 
             # Solve the puzzle only if all constraints are met
+            if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
+                self.__sudokuSolver.setGrid(sudokuPuzzle)
+                if self.__sudokuSolver.solveSudoku():
+                    self.__updateGrid(sudokuPuzzle, blankSquares)
 
         # Display next image onto webcam window
         cv2Img = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2RGBA)

@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import filedialog
 from PIL import Image, ImageTk
 from PuzzleFinder import PuzzleFinder
 from SudokuSolver import SudokuSolver
@@ -12,6 +13,7 @@ class App:
     __webcamWindow = None
     __webcamLabel = None
     __webcamButton = None
+    __uploadButton = None
     __grid = None
     __clearButton = None
     __infoButton = None
@@ -56,7 +58,13 @@ class App:
         self.__webcamButton = tk.Button(self.__mainWindow, command=self.__enableWebcam)
         self.__webcamButton["text"] = "Launch Webcam"
         self.__webcamButton["font"] = "Helvetica 12 bold"
-        self.__webcamButton.place(width=154, height=36, relx=0.5, rely=0.80, anchor=tk.CENTER)
+        self.__webcamButton.place(width=154, height=36, relx=0.35, rely=0.80, anchor=tk.CENTER)
+
+        # Upload Image Button
+        self.__uploadButton = tk.Button(self.__mainWindow, command=self.__uploadImage)
+        self.__uploadButton["text"] = "Upload Image"
+        self.__uploadButton["font"] = "Helvetica 12 bold"
+        self.__uploadButton.place(width=154, height=36, relx=0.65, rely=0.80, anchor=tk.CENTER)
 
         # Clear Button
         self.__clearButton = tk.Button(self.__mainWindow, command=self.__clearGrid)
@@ -154,6 +162,54 @@ class App:
         self.__webcamLabel.imgtk = imgtk
         self.__webcamLabel.configure(image=imgtk)
         self.__webcamLabel.after(10, self.__showFrame)
+
+    def __uploadImage(self):
+        filePath = filedialog.askopenfilename()
+        if filePath.endswith((".png", ".jpg", "jpeg")):
+            # read the image
+            img = cv2.imread(filePath)
+
+            # preprocess image
+            imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            imgBlurred = cv2.GaussianBlur(imgGray, (5, 5), 3)
+            cannyImage = cv2.Canny(imgBlurred, 50, 50)
+
+            # find the largest contour, call it 'cnt'
+            contours, hierarchy = cv2.findContours(cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            if len(contours) == 0:
+                return None
+
+            cnt = max(contours, key=cv2.contourArea)
+
+            # if cnt exists, extract the puzzle, analyze each square, and return a numpy 2darray
+            perimeter = cv2.arcLength(cnt, True)
+            approx = cv2.approxPolyDP(cnt, 0.05 * perimeter, True)
+
+            # if numpy array is valid and can be solved, update the grid
+            """
+
+            self.__puzzleFinder = PuzzleFinder(img)
+            self.__sudokuSolver = SudokuSolver()
+
+            # Get grid contour (if none is found, continue to next frame)
+            self.__puzzleFinder.updateImage(img)
+            hasGrid = self.__puzzleFinder.getGridContour()
+
+            # If contour is found, extract the puzzle from the image and solve the puzzle
+            if hasGrid:
+                # Extract puzzle and solve it
+                self.__puzzleFinder.extractGridFromContour()
+                sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
+
+                # Solve the puzzle only if all constraints are met
+                if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
+                    self.__sudokuSolver.setGrid(sudokuPuzzle)
+                    if self.__sudokuSolver.solveSudoku():
+                        self.__updateGrid(sudokuPuzzle, blankSquares)
+            """
+
+        else:
+            messagebox.showerror("Invalid File Extension", "File must have a .png, .jpg, or .jpeg extension")
 
     @staticmethod
     def __showInfo(self):

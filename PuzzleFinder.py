@@ -2,7 +2,6 @@ import cv2
 import imutils
 import numpy as np
 from math import dist
-from tensorflow.keras.models import load_model
 from keras_preprocessing.image import img_to_array
 from skimage.segmentation import clear_border
 
@@ -27,10 +26,7 @@ class PuzzleFinder:
         imgBlurred = cv2.GaussianBlur(imgGray, (5, 5), 3)
         self.__cannyImage = cv2.Canny(imgBlurred, 50, 50)
 
-    def getCannyImage(self):
-        return self.__cannyImage
-
-    def getGridCorners(self, minArea=200000, maxArea=220000):
+    def getGridCornersWeb(self, minArea=200000, maxArea=220000):
         contours, hierarchy = cv2.findContours(self.__cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         minOutline, maxOutline = minArea-50000, maxArea+50000
 
@@ -62,8 +58,19 @@ class PuzzleFinder:
         self.__gridCorners = None
         return False
 
-    def setCorners(self, corners):
-        self.__gridCorners = corners
+    def getGridCornersUpload(self):
+        contours, hierarchy = cv2.findContours(self.__cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if len(contours) == 0:
+            return False
+
+        cnt = max(contours, key=cv2.contourArea)
+        perimeter = cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, 0.05 * perimeter, True)
+        if not len(approx) == 4:
+            return False
+
+        self.__gridCorners = approx.reshape((4, 2))
+        return True
 
     def extractGridFromCorners(self):
         # Classify each point as top/bottom and left/right

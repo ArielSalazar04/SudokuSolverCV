@@ -50,6 +50,7 @@ class App:
                 var.set("")
                 cell = tk.Entry(self.__grid)
                 cell["font"] = "Helvetica 24 bold"
+                cell['bg'] = "white"
                 cell["justify"] = tk.CENTER
                 cell["highlightbackground"] = "black"
                 cell["highlightthickness"] = 1
@@ -145,7 +146,7 @@ class App:
 
         # Get grid contour (if none is found, continue to next frame)
         self.__puzzleFinder.updateImage(img)
-        hasGrid = self.__puzzleFinder.getGridCorners()
+        hasGrid = self.__puzzleFinder.getGridCornersWeb()
 
         # If contour is found, extract the puzzle from the image and solve the puzzle
         if hasGrid:
@@ -160,7 +161,7 @@ class App:
                     self.__updateGrid(sudokuPuzzle, blankSquares)
 
         # Display next image onto webcam window
-        cv2Img = cv2.cvtColor(img.copy(), cv2.COLOR_BGR2RGBA)
+        cv2Img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
         webcamImg = Image.fromarray(cv2Img)
         imgtk = ImageTk.PhotoImage(image=webcamImg)
         self.__webcamLabel.imgtk = imgtk
@@ -168,48 +169,58 @@ class App:
         self.__webcamLabel.after(10, self.__showFrame)
 
     def __uploadImage(self):
-        filePath = filedialog.askopenfilename()
-
         # if not image file, show error message
+        filePath = filedialog.askopenfilename()
         if not filePath.endswith((".png", ".jpg", "jpeg")):
-            messagebox.showerror("Invalid File Extension", "File must have a .png, .jpg, or .jpeg extension")
+            self.__showFileExtensionError()
             return None
 
         # read and preprocess the image
         img = cv2.imread(filePath)
-        self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
-
-        # find the largest contour, call it 'cnt'
-        cannyImage = self.__puzzleFinder.getCannyImage()
-        contours, hierarchy = cv2.findContours(cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        if len(contours) == 0:
+        if img is None:
+            self.__showIllegalConstraintsError()
             return None
 
-        cnt = max(contours, key=cv2.contourArea)
-        perimeter = cv2.arcLength(cnt, True)
-        approx = cv2.approxPolyDP(cnt, 0.05 * perimeter, True)
-        approx = approx.reshape((4, 2))
-
-        # if cnt exists, extract the puzzle, analyze each square, and return a numpy 2darray
-        self.__puzzleFinder.setCorners(approx)
-        self.__puzzleFinder.extractGridFromCorners()
-        sudokuPuzzle, newCoordinates = self.__puzzleFinder.analyzeSquares()
+        self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
+        self.__sudokuSolver = SudokuSolver()
 
         # if numpy array is valid and can be solved, update the grid
-        self.__sudokuSolver = SudokuSolver(sudokuPuzzle)
+        hasGrid = self.__puzzleFinder.getGridCornersUpload()
 
-        if not self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
-            messagebox.showerror("Error", "Either the puzzle entered does not meet all sudoku constraints or the puzzle was not read correctly. Try again.")
-            return
+        # If contour is found, extract the puzzle from the image and solve the puzzle
+        if hasGrid:
+            # Extract puzzle and solve it
+            flag = self.__puzzleFinder.extractGridFromCorners()
+            if not flag:
+                self.__showIllegalConstraintsError()
+                return None
 
-        self.__sudokuSolver.setGrid(sudokuPuzzle)
-        if self.__sudokuSolver.solveSudoku():
-            self.__updateGrid(sudokuPuzzle, newCoordinates)
+            sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
+
+            # Solve the puzzle only if all constraints are met
+            if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
+                self.__sudokuSolver.setGrid(sudokuPuzzle)
+                if self.__sudokuSolver.solveSudoku():
+                    self.__updateGrid(sudokuPuzzle, blankSquares)
+            else:
+                self.__showIllegalConstraintsError()
+        else:
+            self.__showIllegalConstraintsError()
 
     @staticmethod
-    def __showInfo(self):
+    def __showInfo():
         pass
 
     @staticmethod
     def __showWebcamError():
         messagebox.showerror("Error", "Webcam did not open successfully.")
+
+    @staticmethod
+    def __showIllegalConstraintsError():
+        messagebox.showerror("Error", "Either the puzzle entered does not meet all sudoku constraints or the puzzle "
+                                      "was not read correctly. \nTry again.")
+
+    @staticmethod
+    def __showFileExtensionError():
+        messagebox.showerror("Error", "File must have a .png, .jpg, or .jpeg extension")
+

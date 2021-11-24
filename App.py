@@ -6,6 +6,7 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 from PuzzleFinder import PuzzleFinder
 from SudokuSolver import SudokuSolver
+from tensorflow.keras.models import load_model
 
 
 class App:
@@ -26,6 +27,9 @@ class App:
     __intVars = np.empty((9, 9)).astype(tk.IntVar)
 
     def __init__(self):
+        # Load digit reader
+        self.__digitReader = load_model("model/digitReader.h5")
+
         # Create GUI main window
         self.__mainWindow = tk.Tk()
         self.__mainWindow.title("Sudoku Solver CV")
@@ -123,7 +127,7 @@ class App:
             self.__webcamLabel = tk.Label(self.__webcamWin)
             self.__webcamLabel.pack()
 
-            self.__puzzleFinder = PuzzleFinder(img)
+            self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
             self.__sudokuSolver = SudokuSolver()
             self.__showFrame()
             self.__webcamWin.mainloop()
@@ -141,12 +145,12 @@ class App:
 
         # Get grid contour (if none is found, continue to next frame)
         self.__puzzleFinder.updateImage(img)
-        hasGrid = self.__puzzleFinder.getGridContour()
+        hasGrid = self.__puzzleFinder.getGridCorners()
 
         # If contour is found, extract the puzzle from the image and solve the puzzle
         if hasGrid:
             # Extract puzzle and solve it
-            self.__puzzleFinder.extractGridFromContour()
+            self.__puzzleFinder.extractGridFromCorners()
             sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
 
             # Solve the puzzle only if all constraints are met
@@ -165,51 +169,42 @@ class App:
 
     def __uploadImage(self):
         filePath = filedialog.askopenfilename()
-        if filePath.endswith((".png", ".jpg", "jpeg")):
-            # read the image
-            img = cv2.imread(filePath)
 
-            # preprocess image
-            imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            imgBlurred = cv2.GaussianBlur(imgGray, (5, 5), 3)
-            cannyImage = cv2.Canny(imgBlurred, 50, 50)
-
-            # find the largest contour, call it 'cnt'
-            contours, hierarchy = cv2.findContours(cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-            if len(contours) == 0:
-                return None
-
-            cnt = max(contours, key=cv2.contourArea)
-
-            # if cnt exists, extract the puzzle, analyze each square, and return a numpy 2darray
-            perimeter = cv2.arcLength(cnt, True)
-            approx = cv2.approxPolyDP(cnt, 0.05 * perimeter, True)
-
-            # if numpy array is valid and can be solved, update the grid
-            """
-
-            self.__puzzleFinder = PuzzleFinder(img)
-            self.__sudokuSolver = SudokuSolver()
-
-            # Get grid contour (if none is found, continue to next frame)
-            self.__puzzleFinder.updateImage(img)
-            hasGrid = self.__puzzleFinder.getGridContour()
-
-            # If contour is found, extract the puzzle from the image and solve the puzzle
-            if hasGrid:
-                # Extract puzzle and solve it
-                self.__puzzleFinder.extractGridFromContour()
-                sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
-
-                # Solve the puzzle only if all constraints are met
-                if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
-                    self.__sudokuSolver.setGrid(sudokuPuzzle)
-                    if self.__sudokuSolver.solveSudoku():
-                        self.__updateGrid(sudokuPuzzle, blankSquares)
-            """
-
-        else:
+        # if not image file, show error message
+        if not filePath.endswith((".png", ".jpg", "jpeg")):
             messagebox.showerror("Invalid File Extension", "File must have a .png, .jpg, or .jpeg extension")
+            return None
+
+        # read and preprocess the image
+        img = cv2.imread(filePath)
+        self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
+
+        # find the largest contour, call it 'cnt'
+        cannyImage = self.__puzzleFinder.getCannyImage()
+        contours, hierarchy = cv2.findContours(cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if len(contours) == 0:
+            return None
+
+        cnt = max(contours, key=cv2.contourArea)
+        perimeter = cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, 0.05 * perimeter, True)
+        approx = approx.reshape((4, 2))
+
+        # if cnt exists, extract the puzzle, analyze each square, and return a numpy 2darray
+        self.__puzzleFinder.setCorners(approx)
+        self.__puzzleFinder.extractGridFromCorners()
+        sudokuPuzzle, newCoordinates = self.__puzzleFinder.analyzeSquares()
+
+        # if numpy array is valid and can be solved, update the grid
+        self.__sudokuSolver = SudokuSolver(sudokuPuzzle)
+
+        if not self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
+            messagebox.showerror("Error", "Either the puzzle entered does not meet all sudoku constraints or the puzzle was not read correctly. Try again.")
+            return
+
+        self.__sudokuSolver.setGrid(sudokuPuzzle)
+        if self.__sudokuSolver.solveSudoku():
+            self.__updateGrid(sudokuPuzzle, newCoordinates)
 
     @staticmethod
     def __showInfo(self):

@@ -10,21 +10,37 @@ from tensorflow.keras.models import load_model
 
 
 class App:
+    # Main window widgets & data
     __mainWindow = None
-    __webcamWindow = None
-    __webcamLabel = None
     __webcamButton = None
     __uploadButton = None
-    __grid = None
     __clearButton = None
-    __infoButton = None
+    __grid = None
+    __tutorialButton = None
+    __cells = None
+    __intVars = None
+
+    # Webcam window widgets
+    __webcamWindow = None
+    __webcamLabel = None
     __vc = None
+    __digitReader = None
+
+    # Tutorial window widgets
+    __tutorialWindow = None
+    __tutorialImage = None
+    __tutorialSubtitle = None
+    __tutorialTextVar = None
+    __backButton = None
+    __nextButton = None
+    __images = None
+    __subtitles = None
+    __numPages = 6
+    __pageIndex = 0
+
+    # Helper Classes
     __puzzleFinder = None
     __sudokuSolver = None
-
-    __digitReader = None
-    __cells = np.empty((9, 9)).astype(tk.Entry)
-    __intVars = np.empty((9, 9)).astype(tk.IntVar)
 
     def __init__(self):
         # Load digit reader
@@ -43,6 +59,9 @@ class App:
         self.__grid["highlightbackground"] = "black"
         self.__grid["highlightthickness"] = 1
         self.__grid.place(relx=0.5, rely=0.4, anchor=tk.CENTER, width=362, height=362)
+
+        self.__cells = np.empty((9, 9)).astype(tk.Entry)
+        self.__intVars = np.empty((9, 9)).astype(tk.IntVar)
 
         for i in range(0, 360, 40):
             for j in range(0, 360, 40):
@@ -77,9 +96,31 @@ class App:
         self.__clearButton["font"] = "Helvetica 12 bold"
         self.__clearButton.place(width=154, height=36, relx=0.5, rely=0.90, anchor=tk.CENTER)
 
-        # Information Button
-        self.__infoButton = tk.Button(self.__mainWindow, command=self.__showInfo)
-        self.__infoButton.place(width=36, height=36, relx=0.9, rely=0.90, anchor=tk.CENTER)
+        # Tutorial Button
+        self.__tutorialButton = tk.Button(self.__mainWindow, anchor=tk.S, command=self.__showInfo)
+        self.__tutorialButton["text"] = "i"
+        self.__tutorialButton["font"] = "Courier 12 bold"
+        self.__tutorialButton.place(width=36, height=36, relx=0.9, rely=0.90, anchor=tk.CENTER)
+
+        # Tutorial Data
+        self.__images = [None] * self.__numPages
+        self.__subtitles = [""] * self.__numPages
+
+        self.__images[0] = cv2.imread("images/image1.png")
+        self.__images[1] = cv2.imread("images/image2.png")
+        self.__images[2] = cv2.imread("images/image3.png")
+        self.__images[3] = cv2.imread("images/image4.png")
+        self.__images[4] = cv2.imread("images/image5.png")
+        self.__images[5] = cv2.imread("images/image6.png")
+
+        self.__subtitles[0] = "1. Click on 'Launch Webcam' to open the webcam for\nreading an unsolved Sudoku puzzle."
+        self.__subtitles[1] = "2. Hold up the Sudoku puzzle in front of the webcam."
+        self.__subtitles[2] = "3. Move the Sudoku puzzle closer when prompted to."
+        self.__subtitles[3] = "4. Move the Sudoku puzzle further when prompted to."
+        self.__subtitles[4] = "5. Stop moving tbe puzzle when prompted to."
+        self.__subtitles[5] = "6. The white cells make up the current state, \nthe green cells make up the solution."
+
+        self.__tutorialTextVar = tk.StringVar()
 
         # Launch the Tkinter GUI
         self.__mainWindow.mainloop()
@@ -106,6 +147,10 @@ class App:
         self.__webcamWin.destroy()
         self.__webcamWin.quit()
         self.__vc.release()
+
+    def __killTutorialWin(self):
+        self.__tutorialWindow.destroy()
+        self.__tutorialWindow.quit()
 
     def __enableWebcam(self):
         # Create the webcam
@@ -171,6 +216,9 @@ class App:
     def __uploadImage(self):
         # if not image file, show error message
         filePath = filedialog.askopenfilename()
+        if not filePath:
+            return None
+
         if not filePath.endswith((".png", ".jpg", "jpeg")):
             self.__showFileExtensionError()
             return None
@@ -178,7 +226,7 @@ class App:
         # read and preprocess the image
         img = cv2.imread(filePath)
         if img is None:
-            self.__showIllegalConstraintsError()
+            self.__showIllegalConstraintsError(2)
             return None
 
         self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
@@ -192,7 +240,7 @@ class App:
             # Extract puzzle and solve it
             flag = self.__puzzleFinder.extractGridFromCorners()
             if not flag:
-                self.__showIllegalConstraintsError()
+                self.__showIllegalConstraintsError(4)
                 return None
 
             sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
@@ -203,24 +251,77 @@ class App:
                 if self.__sudokuSolver.solveSudoku():
                     self.__updateGrid(sudokuPuzzle, blankSquares)
             else:
-                self.__showIllegalConstraintsError()
+                self.__showIllegalConstraintsError(5)
         else:
-            self.__showIllegalConstraintsError()
+            self.__showIllegalConstraintsError(3)
 
-    @staticmethod
-    def __showInfo():
-        pass
+    def __showInfo(self):
+        # Create a child window that will contain the tutorial
+        x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
+        self.__tutorialWindow = tk.Toplevel(self.__mainWindow)
+        self.__tutorialWindow.title("Sudoku Solver CV Tutorial")
+        self.__tutorialWindow.geometry("1020x840+%d+%d" % (x + 600, y))
+        self.__tutorialWindow.resizable(False, False)
+        self.__tutorialWindow.bind('<Escape>', lambda w: self.__killTutorialWin())
+        self.__tutorialWindow.protocol("WM_DELETE_WINDOW", self.__killTutorialWin)
+
+        # Assign first image and subtitle to tutorial window
+        self.__tutorialImage = tk.Label(self.__tutorialWindow)
+        self.__tutorialImage.pack(side="top")
+        #self.__tutorialImage.place(relx=0, rely=0)
+        self.__tutorialSubtitle = tk.Label(self.__tutorialWindow, textvariable=self.__tutorialTextVar, height=2)
+        self.__tutorialSubtitle.place(relx=0.325, rely=0.925)
+        self.__pageIndex = 0
+        self.__updatePage(self.__pageIndex)
+
+        # Back and Next button
+        self.__backButton = tk.Button(self.__tutorialWindow, command=self.__backPage)
+        self.__backButton["text"] = "Back"
+        self.__backButton["font"] = "Helvetica 12 bold"
+        self.__backButton["state"] = "disable"
+        self.__backButton.place(width=60, relx=0.025, rely=0.925)
+        self.__nextButton = tk.Button(self.__tutorialWindow, command=self.__nextPage)
+        self.__nextButton["text"] = "Next"
+        self.__nextButton["font"] = "Helvetica 12 bold"
+        self.__nextButton.place(width=60, relx=0.925, rely=0.925)
+
+        self.__tutorialWindow.mainloop()
+
+    def __updatePage(self, index):
+        img = self.__images[index]
+        cv2Img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+        tutorialImg = Image.fromarray(cv2Img)
+        tutorialTk = ImageTk.PhotoImage(image=tutorialImg)
+        self.__tutorialImage.imgtk = tutorialTk
+        self.__tutorialImage.configure(image=tutorialTk)
+        self.__tutorialTextVar.set(self.__subtitles[index])
+
+    def __nextPage(self):
+        if self.__pageIndex == 0:
+            self.__backButton["state"] = "active"
+        self.__pageIndex += 1
+        self.__updatePage(self.__pageIndex)
+        if self.__pageIndex == self.__numPages-1:
+            self.__nextButton["state"] = "disable"
+
+    def __backPage(self):
+        if self.__pageIndex == self.__numPages-1:
+            self.__nextButton["state"] = "active"
+        self.__pageIndex -= 1
+        self.__updatePage(self.__pageIndex)
+        if self.__pageIndex == 0:
+            self.__backButton["state"] = "disable"
 
     @staticmethod
     def __showWebcamError():
-        messagebox.showerror("Error", "Webcam did not open successfully.")
+        messagebox.showerror("Error 000", "Webcam did not open successfully.")
 
     @staticmethod
-    def __showIllegalConstraintsError():
-        messagebox.showerror("Error", "Either the puzzle entered does not meet all sudoku constraints or the puzzle "
-                                      "was not read correctly. \nTry again.")
+    def __showIllegalConstraintsError(err):
+        messagebox.showerror("Error: %03d" % err,
+                             "Either the puzzle entered does not meet all sudoku constraints or the puzzle "
+                             "was not read correctly. \nTry again.")
 
     @staticmethod
     def __showFileExtensionError():
-        messagebox.showerror("Error", "File must have a .png, .jpg, or .jpeg extension")
-
+        messagebox.showerror("Error 001", "File must have a .png, .jpg, or .jpeg extension")

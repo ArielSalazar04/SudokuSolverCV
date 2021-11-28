@@ -97,7 +97,7 @@ class App:
         self.__clearButton.place(width=154, height=36, relx=0.5, rely=0.90, anchor=tk.CENTER)
 
         # Tutorial Button
-        self.__tutorialButton = tk.Button(self.__mainWindow, anchor=tk.S, command=self.__showInfo)
+        self.__tutorialButton = tk.Button(self.__mainWindow, command=self.__showInfo)
         self.__tutorialButton["text"] = "i"
         self.__tutorialButton["font"] = "Courier 12 bold"
         self.__tutorialButton.place(width=36, height=36, relx=0.9, rely=0.90, anchor=tk.CENTER)
@@ -149,6 +149,7 @@ class App:
         self.__vc.release()
 
     def __killTutorialWin(self):
+        self.__tutorialButton["state"] = "active"
         self.__tutorialWindow.destroy()
         self.__tutorialWindow.quit()
 
@@ -256,6 +257,7 @@ class App:
             self.__showIllegalConstraintsError(3)
 
     def __showInfo(self):
+        self.__tutorialButton["state"] = "disable"
         # Create a child window that will contain the tutorial
         x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
         self.__tutorialWindow = tk.Toplevel(self.__mainWindow)
@@ -268,7 +270,6 @@ class App:
         # Assign first image and subtitle to tutorial window
         self.__tutorialImage = tk.Label(self.__tutorialWindow)
         self.__tutorialImage.pack(side="top")
-        #self.__tutorialImage.place(relx=0, rely=0)
         self.__tutorialSubtitle = tk.Label(self.__tutorialWindow, textvariable=self.__tutorialTextVar, height=2)
         self.__tutorialSubtitle.place(relx=0.325, rely=0.925)
         self.__pageIndex = 0

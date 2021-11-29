@@ -180,6 +180,7 @@ class App:
             self.__webcamWin.mainloop()
 
         else:
+            self.__vc.release()
             self.__showWebcamError()
 
     def __showFrame(self):
@@ -315,14 +316,14 @@ class App:
 
     @staticmethod
     def __showWebcamError():
-        messagebox.showerror("Error 000", "Webcam did not open successfully.")
+        messagebox.showerror("Error", "Webcam did not open successfully. ERROR 000")
 
     @staticmethod
     def __showIllegalConstraintsError(err):
-        messagebox.showerror("Error: %03d" % err,
+        messagebox.showerror("Error",
                              "Either the puzzle entered does not meet all sudoku constraints or the puzzle "
-                             "was not read correctly. \nTry again.")
+                             "was not read correctly. \nERROR %03d" % err)
 
     @staticmethod
     def __showFileExtensionError():
-        messagebox.showerror("Error 001", "File must have a .png, .jpg, or .jpeg extension")
+        messagebox.showerror("Error", "File must have a .png, .jpg, or .jpeg extension. ERROR 001")

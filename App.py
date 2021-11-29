@@ -180,6 +180,7 @@ class App:
             self.__webcamWin.mainloop()
 
         else:
+            self.__vc.release()
             self.__showWebcamError()
 
     def __showFrame(self):
@@ -239,11 +240,7 @@ class App:
         # If contour is found, extract the puzzle from the image and solve the puzzle
         if hasGrid:
             # Extract puzzle and solve it
-            flag = self.__puzzleFinder.extractGridFromCorners()
-            if not flag:
-                self.__showIllegalConstraintsError(4)
-                return None
-
+            self.__puzzleFinder.extractGridFromCorners()
             sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
 
             # Solve the puzzle only if all constraints are met
@@ -315,14 +312,14 @@ class App:
 
     @staticmethod
     def __showWebcamError():
-        messagebox.showerror("Error 000", "Webcam did not open successfully.")
+        messagebox.showerror("Error", "Webcam did not open successfully. ERROR 000")
 
     @staticmethod
     def __showIllegalConstraintsError(err):
-        messagebox.showerror("Error: %03d" % err,
+        messagebox.showerror("Error",
                              "Either the puzzle entered does not meet all sudoku constraints or the puzzle "
-                             "was not read correctly. \nTry again.")
+                             "was not read correctly. \nERROR %03d" % err)
 
     @staticmethod
     def __showFileExtensionError():
-        messagebox.showerror("Error 001", "File must have a .png, .jpg, or .jpeg extension")
+        messagebox.showerror("Error", "File must have a .png, .jpg, or .jpeg extension. ERROR 001")

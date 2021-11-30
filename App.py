@@ -249,7 +249,7 @@ class App:
                 if self.__sudokuSolver.solveSudoku():
                     self.__updateGrid(sudokuPuzzle, blankSquares)
             else:
-                self.__showIllegalConstraintsError(5)
+                self.__showIllegalConstraintsError(4)
         else:
             self.__showIllegalConstraintsError(3)
 

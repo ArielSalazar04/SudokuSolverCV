@@ -228,7 +228,7 @@ class App:
         # read and preprocess the image
         img = cv2.imread(filePath)
         if img is None:
-            self.__showIllegalConstraintsError(2)
+            self.__showImageFileNotReadError()
             return None
 
         self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
@@ -248,10 +248,12 @@ class App:
                 self.__sudokuSolver.setGrid(sudokuPuzzle)
                 if self.__sudokuSolver.solveSudoku():
                     self.__updateGrid(sudokuPuzzle, blankSquares)
+                else:
+                    self.__showIllegalConstraintsError()
             else:
-                self.__showIllegalConstraintsError(4)
+                self.__showIllegalConstraintsError()
         else:
-            self.__showIllegalConstraintsError(3)
+            self.__showGridNotFoundError()
 
     def __showInfo(self):
         self.__tutorialButton["state"] = "disable"
@@ -312,14 +314,20 @@ class App:
 
     @staticmethod
     def __showWebcamError():
-        messagebox.showerror("Error", "Webcam did not open successfully. ERROR 000")
-
-    @staticmethod
-    def __showIllegalConstraintsError(err):
-        messagebox.showerror("Error",
-                             "Either the puzzle entered does not meet all sudoku constraints or the puzzle "
-                             "was not read correctly. \nERROR %03d" % err)
+        messagebox.showerror("Error", "Webcam did not open successfully.")
 
     @staticmethod
     def __showFileExtensionError():
-        messagebox.showerror("Error", "File must have a .png, .jpg, or .jpeg extension. ERROR 001")
+        messagebox.showerror("Error", "File must have a .png, .jpg, or .jpeg extension.")
+
+    @staticmethod
+    def __showImageFileNotReadError():
+        messagebox.showerror("Error", "Image file uploaded could not be read.")
+
+    @staticmethod
+    def __showGridNotFoundError():
+        messagebox.showerror("Error", "Grid was not found in the image.")
+
+    @staticmethod
+    def __showIllegalConstraintsError():
+        messagebox.showerror("Error", "Detected puzzle has invalid constraints or was not read properly.")

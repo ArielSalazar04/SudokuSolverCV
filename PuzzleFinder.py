@@ -29,6 +29,7 @@ class PuzzleFinder:
     def getGridCornersWeb(self, minArea=200000, maxArea=220000):
         contours, hierarchy = cv2.findContours(self.__cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         minOutline, maxOutline = minArea-50000, maxArea+50000
+        height, width, _ = self.__image.shape
 
         # find grid contour
         for cnt in contours:
@@ -46,14 +47,14 @@ class PuzzleFinder:
 
                 # Sudoku grid has been detected
                 if minArea <= area <= maxArea:
-                    cv2.putText(self.__image, "Hold Still", (430, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 16)
-                    cv2.putText(self.__image, "Hold Still", (430, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(self.__image, "Hold Still", (int(width * 0.45), int(height * 0.95)), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 16)
+                    cv2.putText(self.__image, "Hold Still", (int(width * 0.45), int(height * 0.95)), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 2)
                     self.__gridCorners = approx.reshape((4, 2))
                     return True
                 else:
                     prompt = "Bring Closer" if area < minArea else "Move Further"
-                    cv2.putText(self.__image, prompt, (420, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 16)
-                    cv2.putText(self.__image, prompt, (420, 720), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(self.__image, prompt, (int(width * 0.42), int(height * 0.95)), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 16)
+                    cv2.putText(self.__image, prompt, (int(width * 0.42), int(height * 0.95)), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 2)
 
         self.__gridCorners = None
         return False

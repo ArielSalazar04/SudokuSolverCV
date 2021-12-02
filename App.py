@@ -51,6 +51,7 @@ class App:
         self.__mainWindow.title("Sudoku Solver CV")
         self.__mainWindow.geometry("%dx%d+%d+%d" % (540, 540, 50, 50))
         self.__mainWindow.resizable(False, False)
+        self.__mainWindow.configure(background="light gray")
         self.__mainWindow.bind('<Escape>', lambda m: self.__killMainWin())
         self.__mainWindow.protocol("WM_DELETE_WINDOW", self.__killMainWin)
 
@@ -70,6 +71,7 @@ class App:
                 cell = tk.Entry(self.__grid)
                 cell["font"] = "Helvetica 24 bold"
                 cell['bg'] = "white"
+                cell['fg'] = "black"
                 cell["justify"] = tk.CENTER
                 cell["highlightbackground"] = "black"
                 cell["highlightthickness"] = 1
@@ -156,8 +158,7 @@ class App:
     def __enableWebcam(self):
         # Create the webcam
         self.__vc = cv2.VideoCapture(0)
-        self.__vc.set(cv2.CAP_PROP_FRAME_WIDTH, 1080)
-        self.__vc.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        width, height = self.__vc.get(cv2.CAP_PROP_FRAME_WIDTH), self.__vc.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
         success, img = self.__vc.read()
         if success:
@@ -167,7 +168,7 @@ class App:
             # Create a child window that will contain the webcam video
             x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
             self.__webcamWin = tk.Toplevel(self.__mainWindow)
-            self.__webcamWin.geometry("1020x760+%d+%d" % (x + 600, y))
+            self.__webcamWin.geometry("%dx%d+%d+%d" % (width, height, x + 600, y))
             self.__webcamWin.resizable(False, False)
             self.__webcamWin.bind('<Escape>', lambda w: self.__killWebcamWin())
             self.__webcamWin.protocol("WM_DELETE_WINDOW", self.__killWebcamWin)

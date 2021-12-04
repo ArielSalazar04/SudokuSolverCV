@@ -35,12 +35,17 @@ class App:
     __nextButton = None
     __images = None
     __subtitles = None
-    __numPages = 6
+    __numPages = 7
     __pageIndex = 0
 
     # Helper Classes
     __puzzleFinder = None
     __sudokuSolver = None
+
+    # Colors
+    LIGHT_RED = "#ff6363"
+    LIGHT_GREEN = "#63ff78"
+    WHITE = "#ffffff"
 
     def __init__(self):
         # Load digit reader
@@ -56,27 +61,33 @@ class App:
         self.__mainWindow.protocol("WM_DELETE_WINDOW", self.__killMainWin)
 
         # Create Grid
-        self.__grid = tk.Frame(self.__mainWindow)
-        self.__grid["highlightbackground"] = "black"
-        self.__grid["highlightthickness"] = 1
-        self.__grid.place(relx=0.5, rely=0.4, anchor=tk.CENTER, width=362, height=362)
+        step = 2
+        self.__grid = tk.Canvas(self.__mainWindow)
+        self.__grid.configure(background="light gray")
+        self.__grid["highlightthickness"] = 0
+        self.__grid.place(relx=0.5, rely=0.4, anchor=tk.CENTER, width=360-step, height=360-step)
 
         self.__cells = np.empty((9, 9)).astype(tk.Entry)
         self.__intVars = np.empty((9, 9)).astype(tk.IntVar)
+
+        # Draw grid lines for 3x3 squares
+        self.__grid.create_line(120, 0, 120, 360 - step, fill="black", width=2*step)
+        self.__grid.create_line(240, 0, 240, 360 - step, fill="black", width=2*step)
+        self.__grid.create_line(0, 120, 360 - step, 120, fill="black", width=2*step)
+        self.__grid.create_line(0, 240, 360 - step, 240, fill="black", width=2*step)
 
         for i in range(0, 360, 40):
             for j in range(0, 360, 40):
                 var = tk.IntVar()
                 var.set("")
                 cell = tk.Entry(self.__grid)
-                cell["font"] = "Helvetica 24 bold"
+                cell["font"] = "Helvetica 16 bold"
                 cell['bg'] = "white"
                 cell['fg'] = "black"
                 cell["justify"] = tk.CENTER
-                cell["highlightbackground"] = "black"
-                cell["highlightthickness"] = 1
+                cell["highlightthickness"] = 0
                 cell["textvariable"] = var
-                cell.place(width=40, height=40, x=j, y=i)
+                cell.place(width=40-step, height=40-step, x=j, y=i)
                 self.__cells[i // 40, j // 40] = cell
                 self.__intVars[i // 40, j // 40] = var
 
@@ -84,24 +95,28 @@ class App:
         self.__webcamButton = tk.Button(self.__mainWindow, command=self.__enableWebcam)
         self.__webcamButton["text"] = "Launch Webcam"
         self.__webcamButton["font"] = "Helvetica 12 bold"
+        self.__webcamButton["highlightthickness"] = 0
         self.__webcamButton.place(width=154, height=36, relx=0.35, rely=0.80, anchor=tk.CENTER)
 
         # Upload Image Button
         self.__uploadButton = tk.Button(self.__mainWindow, command=self.__uploadImage)
         self.__uploadButton["text"] = "Upload Image"
         self.__uploadButton["font"] = "Helvetica 12 bold"
+        self.__uploadButton["highlightthickness"] = 0
         self.__uploadButton.place(width=154, height=36, relx=0.65, rely=0.80, anchor=tk.CENTER)
 
         # Clear Button
         self.__clearButton = tk.Button(self.__mainWindow, command=self.__clearGrid)
         self.__clearButton["text"] = "Clear Grid"
         self.__clearButton["font"] = "Helvetica 12 bold"
+        self.__clearButton["highlightthickness"] = 0
         self.__clearButton.place(width=154, height=36, relx=0.5, rely=0.90, anchor=tk.CENTER)
 
         # Tutorial Button
         self.__tutorialButton = tk.Button(self.__mainWindow, command=self.__showInfo)
         self.__tutorialButton["text"] = "i"
         self.__tutorialButton["font"] = "Courier 12 bold"
+        self.__tutorialButton["highlightthickness"] = 0
         self.__tutorialButton.place(width=36, height=36, relx=0.9, rely=0.90, anchor=tk.CENTER)
 
         # Tutorial Data
@@ -114,13 +129,15 @@ class App:
         self.__images[3] = cv2.imread("images/image4.png")
         self.__images[4] = cv2.imread("images/image5.png")
         self.__images[5] = cv2.imread("images/image6.png")
+        self.__images[6] = cv2.imread("images/image7.png")
 
         self.__subtitles[0] = "1. Click on 'Launch Webcam' to open the webcam for\nreading an unsolved Sudoku puzzle."
         self.__subtitles[1] = "2. Hold up the Sudoku puzzle in front of the webcam."
         self.__subtitles[2] = "3. Move the Sudoku puzzle closer when prompted to."
         self.__subtitles[3] = "4. Move the Sudoku puzzle further when prompted to."
         self.__subtitles[4] = "5. Stop moving tbe puzzle when prompted to."
-        self.__subtitles[5] = "6. The white cells make up the current state, \nthe green cells make up the solution."
+        self.__subtitles[5] = "6. The red cells make up the illegal constraints\nof the puzzle."
+        self.__subtitles[6] = "7. The white cells make up the current state, \nthe green cells make up the solution."
 
         self.__tutorialTextVar = tk.StringVar()
 
@@ -131,8 +148,14 @@ class App:
         for i in range(9):
             for j in range(9):
                 self.__intVars[i, j].set(sudokuGrid[i, j])
-                self.__cells[i, j]["bg"] = "green" if (i, j) in newCoordinates else "white"
-                self.__cells[i, j]["font"] = "Helvetica 16 bold" if (i, j) in newCoordinates else "Helvetica 16"
+                self.__cells[i, j]["bg"] = self.LIGHT_GREEN if (i, j) in newCoordinates else self.WHITE
+
+    def __showIllegalGrid(self, sudokuGrid, conflicts):
+        for i in range(9):
+            for j in range(9):
+                if not sudokuGrid[i, j] == 0:
+                    self.__intVars[i, j].set(sudokuGrid[i, j])
+                    self.__cells[i, j]["bg"] = self.LIGHT_RED if (i, j) in conflicts else self.WHITE
 
     def __clearGrid(self):
         for i in range(9):
@@ -206,7 +229,16 @@ class App:
             if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
                 self.__sudokuSolver.setGrid(sudokuPuzzle)
                 if self.__sudokuSolver.solveSudoku():
+                    self.__clearGrid()
                     self.__updateGrid(sudokuPuzzle, blankSquares)
+                else:
+                    conflicts = self.__sudokuSolver.getAllConflicts(sudokuPuzzle)
+                    self.__clearGrid()
+                    self.__showIllegalGrid(sudokuPuzzle, conflicts)
+            else:
+                conflicts = self.__sudokuSolver.getAllConflicts(sudokuPuzzle)
+                self.__clearGrid()
+                self.__showIllegalGrid(sudokuPuzzle, conflicts)
 
         # Display next image onto webcam window
         cv2Img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
@@ -248,10 +280,14 @@ class App:
             if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
                 self.__sudokuSolver.setGrid(sudokuPuzzle)
                 if self.__sudokuSolver.solveSudoku():
+                    self.__clearGrid()
                     self.__updateGrid(sudokuPuzzle, blankSquares)
                 else:
-                    self.__showIllegalConstraintsError()
+                    self.__impossiblePuzzleError()
             else:
+                conflicts = self.__sudokuSolver.getAllConflicts(sudokuPuzzle)
+                self.__clearGrid()
+                self.__showIllegalGrid(sudokuPuzzle, conflicts)
                 self.__showIllegalConstraintsError()
         else:
             self.__showGridNotFoundError()
@@ -332,3 +368,8 @@ class App:
     @staticmethod
     def __showIllegalConstraintsError():
         messagebox.showerror("Error", "Detected puzzle has invalid constraints or was not read properly.")
+
+    @staticmethod
+    def __impossiblePuzzleError():
+        messagebox.showerror("Error", "Puzzle is impossible to solve.")
+

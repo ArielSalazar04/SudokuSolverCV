@@ -35,7 +35,7 @@ class App:
     __nextButton = None
     __images = None
     __subtitles = None
-    __numPages = 6
+    __numPages = 7
     __pageIndex = 0
 
     # Helper Classes
@@ -129,13 +129,15 @@ class App:
         self.__images[3] = cv2.imread("images/image4.png")
         self.__images[4] = cv2.imread("images/image5.png")
         self.__images[5] = cv2.imread("images/image6.png")
+        self.__images[6] = cv2.imread("images/image7.png")
 
         self.__subtitles[0] = "1. Click on 'Launch Webcam' to open the webcam for\nreading an unsolved Sudoku puzzle."
         self.__subtitles[1] = "2. Hold up the Sudoku puzzle in front of the webcam."
         self.__subtitles[2] = "3. Move the Sudoku puzzle closer when prompted to."
         self.__subtitles[3] = "4. Move the Sudoku puzzle further when prompted to."
         self.__subtitles[4] = "5. Stop moving tbe puzzle when prompted to."
-        self.__subtitles[5] = "6. The white cells make up the current state, \nthe green cells make up the solution."
+        self.__subtitles[5] = "6. The red cells make up the illegal constraints\nof the puzzle."
+        self.__subtitles[6] = "7. The white cells make up the current state, \nthe green cells make up the solution."
 
         self.__tutorialTextVar = tk.StringVar()
 
@@ -369,5 +371,5 @@ class App:
 
     @staticmethod
     def __impossiblePuzzleError():
-        messagebox.showerror("Error", "Impossible Sudoku has been entered.")
+        messagebox.showerror("Error", "Puzzle is impossible to solve.")
 

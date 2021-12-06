@@ -87,3 +87,45 @@ class SudokuSolver:
                 seen.clear()
 
         return True
+
+    @staticmethod
+    def getAllConflicts(grid):
+        conflicts = set()
+        lookupTable = dict()
+
+        # row conflicts
+        for row in range(9):
+            for col in range(9):
+                if not grid[row, col] == 0:
+                    if grid[row, col] in lookupTable:
+                        conflicts.add((row, col))
+                        conflicts.add((lookupTable[grid[row, col]]))
+                    else:
+                        lookupTable[grid[row, col]] = (row, col)
+            lookupTable.clear()
+
+        # column conflicts
+        for col in range(9):
+            for row in range(9):
+                if not grid[row, col] == 0:
+                    if grid[row, col] in lookupTable:
+                        conflicts.add((row, col))
+                        conflicts.add((lookupTable[grid[row, col]]))
+                    else:
+                        lookupTable[grid[row, col]] = (row, col)
+            lookupTable.clear()
+
+        # 3x3 square conflicts
+        for c in range(0, 9, 3):
+            for r in range(0, 9, 3):
+                for j in range(c, c + 3):
+                    for i in range(r, r + 3):
+                        if not grid[i, j] == 0:
+                            if grid[i, j] in lookupTable:
+                                conflicts.add((i, j))
+                                conflicts.add((lookupTable[grid[i, j]]))
+                            else:
+                                lookupTable[grid[i, j]] = (i, j)
+                lookupTable.clear()
+
+        return conflicts

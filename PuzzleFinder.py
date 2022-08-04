@@ -59,15 +59,16 @@ class PuzzleFinder:
         self.__gridCorners = None
         return False
 
-    def getGridCornersUpload(self):
+    def getGridContours(self):
         contours, hierarchy = cv2.findContours(self.__cannyImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         if len(contours) == 0:
-            return False
+            return None
+        return contours
 
-        cnt = max(contours, key=cv2.contourArea)
+    def setContour(self, cnt):
         perimeter = cv2.arcLength(cnt, True)
         approx = cv2.approxPolyDP(cnt, 0.05 * perimeter, True)
-        if not len(approx) == 4:
+        if len(approx) != 4:
             return False
 
         self.__gridCorners = approx.reshape((4, 2))

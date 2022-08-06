@@ -26,6 +26,17 @@ class App:
     __vc = None
     __digitReader = None
 
+    # Upload window widgets & data
+    __uploadWindow = None
+    __uploadImageLabel = None
+    __uploadBackButton = None
+    __uploadNextButton = None
+    __uploadApproveButton = None
+    __uploadCurrentImage = None
+    __uploadContourList = None
+    __uploadPageIndex = 0
+    __uploadContourSize = 0
+
     # Tutorial window widgets
     __tutorialWindow = None
     __tutorialImage = None
@@ -46,6 +57,7 @@ class App:
     LIGHT_RED = "#ff6363"
     LIGHT_GREEN = "#63ff78"
     WHITE = "#ffffff"
+    BACKGROUND_COLOR = "light gray"
 
     def __init__(self):
         # Load digit reader
@@ -56,14 +68,14 @@ class App:
         self.__mainWindow.title("Sudoku Solver CV")
         self.__mainWindow.geometry("%dx%d+%d+%d" % (540, 540, 50, 50))
         self.__mainWindow.resizable(False, False)
-        self.__mainWindow.configure(background="light gray")
+        self.__mainWindow.configure(background=self.BACKGROUND_COLOR)
         self.__mainWindow.bind('<Escape>', lambda m: self.__killMainWin())
         self.__mainWindow.protocol("WM_DELETE_WINDOW", self.__killMainWin)
 
         # Create Grid
         step = 2
         self.__grid = tk.Canvas(self.__mainWindow)
-        self.__grid.configure(background="light gray")
+        self.__grid.configure(background=self.BACKGROUND_COLOR)
         self.__grid["highlightthickness"] = 0
         self.__grid.place(relx=0.5, rely=0.4, anchor=tk.CENTER, width=360-step, height=360-step)
 
@@ -104,6 +116,9 @@ class App:
         self.__uploadButton["font"] = "Helvetica 12 bold"
         self.__uploadButton["highlightthickness"] = 0
         self.__uploadButton.place(width=154, height=36, relx=0.65, rely=0.80, anchor=tk.CENTER)
+
+        # Upload Image Lists
+        self.__uploadContourList = []
 
         # Clear Button
         self.__clearButton = tk.Button(self.__mainWindow, command=self.__clearGrid)
@@ -164,19 +179,49 @@ class App:
                 self.__cells[i, j]['bg'] = "white"
 
     def __killMainWin(self):
+        # destroy the main window
         self.__mainWindow.destroy()
         self.__mainWindow.quit()
 
     def __killWebcamWin(self):
-        self.__webcamButton["state"] = "normal"
+        # reactivate buttons on main window
+        self.__toggleMainMenuButtons("normal")
+
+        # destroy the webcam window
         self.__webcamWin.destroy()
         self.__webcamWin.quit()
         self.__vc.release()
 
+    def __killUploadWin(self):
+        # reactivate buttons on main window
+        self.__toggleMainMenuButtons("normal")
+
+        # reset upload window data members to default values
+        self.__uploadContourList.clear()
+        self.__uploadCurrentImage = None
+        self.__uploadPageIndex = 0
+        self.__uploadContourSize = 0
+
+        # destroy the upload window
+        self.__uploadWindow.destroy()
+
     def __killTutorialWin(self):
-        self.__tutorialButton["state"] = "active"
+        # reactivate buttons on main window
+        self.__toggleMainMenuButtons("normal")
+
+        # destroy the tutorial window
         self.__tutorialWindow.destroy()
         self.__tutorialWindow.quit()
+
+    def __approve(self):
+        # update contour that will be used to extract the grid, if possible
+        success = self.__puzzleFinder.setContour(self.__uploadContourList[self.__uploadPageIndex])
+        if not success:
+            self.__showGridNotFoundError()
+            return None
+
+        # extract the grid from the image and solve the puzzle
+        self.__extractAndSolve()
 
     def __enableWebcam(self):
         # Create the webcam
@@ -193,6 +238,7 @@ class App:
             self.__webcamWin = tk.Toplevel(self.__mainWindow)
             self.__webcamWin.geometry("%dx%d+%d+%d" % (width, height, x + 600, y))
             self.__webcamWin.resizable(False, False)
+            self.__webcamWin.configure(background=self.BACKGROUND_COLOR)
             self.__webcamWin.bind('<Escape>', lambda w: self.__killWebcamWin())
             self.__webcamWin.protocol("WM_DELETE_WINDOW", self.__killWebcamWin)
             self.__webcamLabel = tk.Label(self.__webcamWin)
@@ -249,57 +295,149 @@ class App:
         self.__webcamLabel.after(10, self.__showFrame)
 
     def __uploadImage(self):
-        # if not image file, show error message
+        # ask the user for an image file
         filePath = filedialog.askopenfilename()
+
+        # if image file was not selected, stop
         if not filePath:
             return None
 
+        # disable all buttons on main window
+        self.__toggleMainMenuButtons("disabled")
+
+        # if image file does not have an appropriate file extension, stop
         if not filePath.endswith((".png", ".jpg", "jpeg")):
             self.__showFileExtensionError()
             return None
 
-        # read and preprocess the image
-        img = cv2.imread(filePath)
-        if img is None:
+        # read the image from the file path
+        self.__uploadCurrentImage = cv2.imread(filePath)
+        if self.__uploadCurrentImage is None:
             self.__showImageFileNotReadError()
             return None
 
-        self.__puzzleFinder = PuzzleFinder(img, self.__digitReader)
+        # get the grid contour and vertices
+        self.__puzzleFinder = PuzzleFinder(self.__uploadCurrentImage, self.__digitReader)
         self.__sudokuSolver = SudokuSolver()
+        contours = self.__puzzleFinder.getGridContours()
 
-        # if numpy array is valid and can be solved, update the grid
-        hasGrid = self.__puzzleFinder.getGridCornersUpload()
+        # if no contours were calculated, stop
+        if contours is None:
+            self.__showNoContoursError()
+            return None
 
-        # If contour is found, extract the puzzle from the image and solve the puzzle
-        if hasGrid:
-            # Extract puzzle and solve it
-            self.__puzzleFinder.extractGridFromCorners()
-            sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
+        # sort contours by largest area to smallest
+        self.__uploadContourList = sorted(contours, key=cv2.contourArea, reverse=True)
+        self.__uploadContourSize = int(cv2.contourArea(self.__uploadContourList[0]) // 14e4)
 
-            # Solve the puzzle only if all constraints are met
-            if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
-                self.__sudokuSolver.setGrid(sudokuPuzzle)
-                if self.__sudokuSolver.solveSudoku():
-                    self.__clearGrid()
-                    self.__updateGrid(sudokuPuzzle, blankSquares)
-                else:
-                    self.__impossiblePuzzleError()
-            else:
-                conflicts = self.__sudokuSolver.getAllConflicts(sudokuPuzzle)
+        # open the upload window
+        x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
+        self.__uploadWindow = tk.Toplevel(self.__mainWindow)
+        self.__uploadWindow.geometry("%dx%d+%d+%d" % (580, 640, x + 600, y))
+        self.__uploadWindow.resizable(False, False)
+        self.__uploadWindow.configure(background=self.BACKGROUND_COLOR)
+        self.__uploadWindow.bind('<Escape>', lambda w: self.__killUploadWin())
+        self.__uploadWindow.protocol("WM_DELETE_WINDOW", self.__killUploadWin)
+
+        self.__uploadBackButton = tk.Button(self.__uploadWindow, command=self.__uploadBackPage)
+        self.__uploadBackButton["text"] = "Back"
+        self.__uploadBackButton["font"] = "Helvetica 12 bold"
+        self.__uploadBackButton["state"] = "disable"
+        self.__uploadBackButton["highlightthickness"] = 0
+        self.__uploadBackButton.place(width=60, height=28, relx=0.05, rely=0.925)
+
+        self.__uploadNextButton = tk.Button(self.__uploadWindow, command=self.__uploadNextPage)
+        self.__uploadNextButton["text"] = "Next"
+        self.__uploadNextButton["font"] = "Helvetica 12 bold"
+        self.__uploadNextButton["highlightthickness"] = 0
+        self.__uploadNextButton.place(width=60, height=28, relx=0.85, rely=0.925)
+
+        self.__uploadApproveButton = tk.Button(self.__uploadWindow, command=lambda: self.__approve())
+        self.__uploadApproveButton["text"] = "Approve"
+        self.__uploadApproveButton["font"] = "Helvetica 12 bold"
+        self.__uploadApproveButton["highlightthickness"] = 0
+        self.__uploadApproveButton.place(width=90, height=28, relx=0.425, rely=0.925)
+
+        self.__uploadLabel = tk.Label(self.__uploadWindow, borderwidth=4, relief="solid")
+        self.__uploadLabel.pack(anchor="n", pady=8)
+
+        # display the first image with contour on the upload window
+        self.__uploadUpdateImages(self.__uploadPageIndex)
+
+    def __uploadUpdateImages(self, index):
+        # get an approximation of the contour
+        cnt = self.__uploadContourList[index]
+        perimeter = cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, 0.05 * perimeter, True)
+
+        # copy the current image
+        newImg = self.__uploadCurrentImage.copy()
+
+        # draw contour and corners on image
+        cv2.cvtColor(newImg, cv2.COLOR_BGR2RGBA)
+        cv2.drawContours(newImg, [approx], -1, (0, 255, 0), self.__uploadContourSize)
+        for point in approx:
+            cv2.circle(newImg, point[0], self.__uploadContourSize, (0, 0, 255), self.__uploadContourSize)
+
+        # resize the image
+        newWidth = int(self.__uploadCurrentImage.shape[1] * 540 / self.__uploadCurrentImage.shape[0])
+        newImg = cv2.resize(newImg, (newWidth, 540), interpolation=cv2.INTER_AREA)
+
+        # display image
+        webcamImg = Image.fromarray(newImg)
+        imgtk = ImageTk.PhotoImage(webcamImg)
+        self.__uploadLabel.configure(image=imgtk)
+        self.__uploadLabel.image = imgtk
+
+    def __uploadNextPage(self):
+        if self.__uploadPageIndex == 0:
+            self.__uploadBackButton["state"] = "normal"
+        self.__uploadPageIndex += 1
+        self.__uploadUpdateImages(self.__uploadPageIndex)
+        if self.__uploadPageIndex == len(self.__uploadContourList)-1:
+            self.__uploadNextButton["state"] = "disable"
+
+    def __uploadBackPage(self):
+        if self.__uploadPageIndex == len(self.__uploadContourList)-1:
+            self.__uploadNextButton["state"] = "normal"
+        self.__uploadPageIndex -= 1
+        self.__uploadUpdateImages(self.__uploadPageIndex)
+        if self.__uploadPageIndex == 0:
+            self.__uploadBackButton["state"] = "disable"
+
+    def __toggleMainMenuButtons(self, state):
+        self.__webcamButton["state"] = state
+        self.__uploadButton["state"] = state
+        self.__clearButton["state"] = state
+        self.__tutorialButton["state"] = state
+
+    def __extractAndSolve(self):
+        # Extract puzzle and solve it
+        self.__puzzleFinder.extractGridFromCorners()
+        sudokuPuzzle, blankSquares = self.__puzzleFinder.analyzeSquares()
+
+        # Solve the puzzle only if all constraints are met
+        if self.__sudokuSolver.isValidPuzzle(sudokuPuzzle):
+            self.__sudokuSolver.setGrid(sudokuPuzzle)
+            if self.__sudokuSolver.solveSudoku():
                 self.__clearGrid()
-                self.__showIllegalGrid(sudokuPuzzle, conflicts)
-                self.__showIllegalConstraintsError()
+                self.__updateGrid(sudokuPuzzle, blankSquares)
+            else:
+                self.__impossiblePuzzleError()
         else:
-            self.__showGridNotFoundError()
+            conflicts = self.__sudokuSolver.getAllConflicts(sudokuPuzzle)
+            self.__clearGrid()
+            self.__showIllegalGrid(sudokuPuzzle, conflicts)
+            self.__showIllegalConstraintsError()
 
     def __showInfo(self):
-        self.__tutorialButton["state"] = "disable"
         # Create a child window that will contain the tutorial
         x, y = self.__mainWindow.winfo_x(), self.__mainWindow.winfo_y()
         self.__tutorialWindow = tk.Toplevel(self.__mainWindow)
         self.__tutorialWindow.title("Sudoku Solver CV Tutorial")
         self.__tutorialWindow.geometry("1020x840+%d+%d" % (x + 600, y))
         self.__tutorialWindow.resizable(False, False)
+        self.__tutorialWindow.configure(background=self.BACKGROUND_COLOR)
         self.__tutorialWindow.bind('<Escape>', lambda w: self.__killTutorialWin())
         self.__tutorialWindow.protocol("WM_DELETE_WINDOW", self.__killTutorialWin)
 
@@ -307,6 +445,8 @@ class App:
         self.__tutorialImage = tk.Label(self.__tutorialWindow)
         self.__tutorialImage.pack(side="top")
         self.__tutorialSubtitle = tk.Label(self.__tutorialWindow, textvariable=self.__tutorialTextVar, height=2)
+        self.__tutorialSubtitle.configure(fg="black")
+        self.__tutorialSubtitle.configure(bg=self.BACKGROUND_COLOR)
         self.__tutorialSubtitle.place(relx=0.325, rely=0.925)
         self.__pageIndex = 0
         self.__updatePage(self.__pageIndex)
@@ -316,11 +456,14 @@ class App:
         self.__backButton["text"] = "Back"
         self.__backButton["font"] = "Helvetica 12 bold"
         self.__backButton["state"] = "disable"
-        self.__backButton.place(width=60, relx=0.025, rely=0.925)
+        self.__backButton["highlightthickness"] = 0
+        self.__backButton.place(width=60, height=28, relx=0.025, rely=0.925)
+
         self.__nextButton = tk.Button(self.__tutorialWindow, command=self.__nextPage)
         self.__nextButton["text"] = "Next"
         self.__nextButton["font"] = "Helvetica 12 bold"
-        self.__nextButton.place(width=60, relx=0.925, rely=0.925)
+        self.__nextButton["highlightthickness"] = 0
+        self.__nextButton.place(width=60, height=28, relx=0.925, rely=0.925)
 
         self.__tutorialWindow.mainloop()
 
@@ -335,7 +478,7 @@ class App:
 
     def __nextPage(self):
         if self.__pageIndex == 0:
-            self.__backButton["state"] = "active"
+            self.__backButton["state"] = "normal"
         self.__pageIndex += 1
         self.__updatePage(self.__pageIndex)
         if self.__pageIndex == self.__numPages-1:
@@ -343,7 +486,7 @@ class App:
 
     def __backPage(self):
         if self.__pageIndex == self.__numPages-1:
-            self.__nextButton["state"] = "active"
+            self.__nextButton["state"] = "normal"
         self.__pageIndex -= 1
         self.__updatePage(self.__pageIndex)
         if self.__pageIndex == 0:
@@ -360,6 +503,9 @@ class App:
     @staticmethod
     def __showImageFileNotReadError():
         messagebox.showerror("Error", "Image file uploaded could not be read.")
+    @staticmethod
+    def __showNoContoursError():
+        messagebox.showerror("Error", "No contours were found in the image.")
 
     @staticmethod
     def __showGridNotFoundError():

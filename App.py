@@ -168,7 +168,7 @@ class App:
     def __showIllegalGrid(self, sudokuGrid, conflicts):
         for i in range(9):
             for j in range(9):
-                if not sudokuGrid[i, j] == 0:
+                if sudokuGrid[i, j] != 0:
                     self.__intVars[i, j].set(sudokuGrid[i, j])
                     self.__cells[i, j]["bg"] = self.LIGHT_RED if (i, j) in conflicts else self.WHITE
 
